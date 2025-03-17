@@ -1,0 +1,100 @@
+---
+title: "STA365-Project-Model"
+author: "Huiyang Chen"
+date: "2024-03-23"
+output: pdf_document
+---
+
+The goal of this file is to investigate multi-collinearity issue under the Frequentist setting.
+
+## Approach 1 - VIF (Variance Inflation Factors)
+
+```{r, message = F, warning = F}
+library(tidyverse)
+library(car)
+library(lme4)
+library(vcd)
+```
+
+```{r}
+df <- read.csv("/Users/chenhuiyang/Documents/UofT/STA365/zone_entries.csv")
+```
+
+```{r}
+df <- df %>%
+  filter(Period != 4) %>%
+  mutate(y_coord_centered = Y.Coordinate - 42.5) %>%
+  mutate(zone_entry_success = ifelse(zone_entry_success == "True", 1, 0)) %>%
+  mutate(Team = factor(Team)) %>%
+  mutate(Period = factor(Period)) %>%
+  mutate(Entry_Type = factor(Entry_Type)) %>%
+  mutate(is_forward = factor(is_forward))
+```
+
+```{r}
+glimpse(df)
+```
+
+```{r}
+glm1 <- glm(zone_entry_success ~ Period + Team + Entry_Type + is_forward +
+              y_coord_centered, data = df)
+summary(glm1)
+```
+
+```{r}
+vif(glm1)
+```
+```{r}
+glmm1 <- glmer(zone_entry_success ~ factor(Period) + factor(Team) + 
+              factor(Entry_Type) + 
+              factor(is_forward) + 
+                y_coord_centered + (1 | Player), family = 'binomial', data = df)
+summary(glmm1)
+```
+
+```{r}
+vif(glmm1)
+```
+Takeaway: For both glm and glmm, VIF does not show multi-collinear issues (no variable with VIF > 5). But VIF is designed for lm, so let's proceed with caution and use other methods to look for multi-collinearity too.
+
+## Approach 2: Cramér's V 
+
+Cramér's V is designed to construct correlation matrix with categorical variables.
+
+```{r}
+df_cat = df %>% select(Team, Period, is_forward, Entry_Type)
+compute_cramers_v_matrix <- function(df) {
+  variables <- colnames(df)
+  n <- length(variables)
+  v_matrix <- matrix(NA, n, n, dimnames = list(variables, variables))
+  
+  for (i in 1:n) {
+    for (j in i:n) {
+      if (i == j) {
+        v_matrix[i, j] <- 1  # A variable is always perfectly correlated with itself
+      } else {
+        # Construct a contingency table for each pair of variables
+        contingency_table <- table(df[, i], df[, j])
+        # Compute Cramér's V using assocstats function
+        cramer_v <- sqrt(assocstats(contingency_table)$cramer)
+        # Fill symmetric matrix positions
+        v_matrix[i, j] <- cramer_v
+        v_matrix[j, i] <- cramer_v
+      }
+    }
+  }
+  return(v_matrix)
+}
+
+# Assuming your dataframe is named df and has variables var1, var2, var3, var4
+# df <- data.frame(var1 = factor(...), var2 = factor(...), var3 = factor(...), var4 = factor(...))
+
+# Compute and print the Cramér's V correlation matrix
+cramers_v_matrix <- compute_cramers_v_matrix(df_cat)
+print(cramers_v_matrix)
+
+```
+
+According to the correlation matrix above, no strong correlation found between categorical variables.
+
+That being said, the variables selected should not have any big multi-collinearity issue.
