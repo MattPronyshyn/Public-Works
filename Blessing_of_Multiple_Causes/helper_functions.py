@@ -1,7 +1,9 @@
 import numpy as np
 import pandas as pd
+import arviz as az
+import scipy.stats as stats
 import pymc as pm
-from scipy import stats
+import matplotlib.pyplot as plt
 
 def create_offensive_defensive_datasets(entries_df, player_teams_df):
     """
@@ -182,7 +184,6 @@ players_positions = {
     'Anne Cherkowski': 'F',
     'Allyson Simpson': 'D'
 }
-
 
 def plot_rankings(trace, dataset):
     summary_offensive = az.summary(trace, var_names=['offensive_coeff'], hdi_prob=0.94)
