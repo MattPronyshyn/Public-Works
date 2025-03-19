@@ -131,3 +131,100 @@ def predictive_score(offensive_dataset, mask, num_mask, num_iter=100, random_see
     score = np.mean(replicated < actual[:, None], axis=1)
     return float(score.mean())
 
+# Calculate summary statistics for coefficients
+players_positions = {
+    'Blayre Turnbull': 'F',
+    'Hilary Knight': 'F',
+    'Sarah Fillier': 'F',
+    'Hannah Bilka': 'F',
+    'Brianne Jenner': 'F',
+    'Alex Carpenter': 'F',
+    'Natalie Buchbinder': 'D',
+    'Jessie Eldridge': 'F',
+    'Grace Zumwinkle': 'F',
+    'Jamie Lee Rattray': 'F',
+    'Emma Maltais': 'F',
+    'Cayla Barnes': 'D',
+    'Ashton Bell': 'D',
+    'Emily Clark': 'F',
+    'Haley Winn': 'D',
+    'Abbey Murphy': 'F',
+    'Sarah Nurse': 'F',
+    'Megan Keller': 'D',
+    'Lacey Eden': 'F',
+    'Renata Fast': 'D',
+    'Laura Stacey': 'F',
+    'Julia Gosling': 'F',
+    'Jamie Bourbonnais': 'D',
+    'Tessa Janecke': 'F',
+    'Abby Roque': 'F',
+    'Taylor Heise': 'F',
+    'Ella Shelton': 'D',
+    'Savannah Harmon': 'D',
+    'Marie-Philip Poulin': 'F',
+    'Hayley Scamurra': 'F',
+    'Gabbie Hughes': 'F',
+    'Jessica DiGirolamo': 'D',
+    "Kristin O'Neill": 'F',
+    'Erin Ambrose': 'D',
+    'Britta Curl': 'F',
+    'Kelly Pannek': 'F',
+    'Jocelyne Larocque': 'D',
+    'Rory Guilday': 'D',
+    'Sophie Jaques': 'D',
+    'Laila Edwards': 'F',
+    'Jennifer Gardiner': 'F',
+    'Caroline Harvey': 'D',
+    'Loren Gabel': 'F',
+    'Kirsten Simms': 'F',
+    'Danielle Serdachny': 'F',
+    'Anna Wilgren': 'D',
+    'Anne Cherkowski': 'F',
+    'Allyson Simpson': 'D'
+}
+
+
+def plot_rankings(trace, dataset):
+    summary_offensive = az.summary(trace, var_names=['offensive_coeff'], hdi_prob=0.94)
+    summary_offensive = summary_offensive.assign(names=dataset.columns)
+
+    summary_defensive = az.summary(trace, var_names=['defensive_coeff'], hdi_prob=0.94)
+    summary_defensive = summary_defensive.assign(names=dataset.columns)
+
+    # Sort the summary by mean values
+    summary_sorted_offensive = summary_offensive.sort_values(by='mean')
+    summary_sorted_defensive = summary_defensive.sort_values(by='mean')
+
+    # Extract means and HDI intervals after sorting
+    means_offensive, means_defensive = summary_sorted_offensive['mean'], summary_sorted_defensive['mean']
+    hdi_lower_offensive, hdi_lower_defensive = summary_sorted_offensive['hdi_3%'], summary_sorted_defensive['hdi_3%']
+    hdi_upper_offensive, hdi_upper_defensive = summary_sorted_offensive['hdi_97%'] , summary_sorted_defensive['hdi_97%']
+
+    # Calculate errors from mean to lower and upper bounds
+    errors_offensive = [means_offensive - hdi_lower_offensive, hdi_upper_offensive - means_offensive]
+    errors_defensive = [means_defensive - hdi_lower_defensive, hdi_upper_defensive - means_defensive]
+
+
+    plt.figure(figsize=(12, 8))
+    for i, player in enumerate(summary_sorted_offensive['names']):
+        color = 'blue' if players_positions.get(player, 'F') == 'F' else 'red'
+        plt.errorbar(i, means_offensive[i], yerr=[[errors_offensive[0][i]], [errors_offensive[1][i]]], 
+                     fmt='o', capsize=5, capthick=2, color=color)
+    plt.xticks(range(len(summary_sorted_offensive['names'])), summary_sorted_offensive['names'], rotation='vertical')
+    plt.xlabel('Player')
+    plt.ylabel('Offensive Skill Estimate')
+    plt.title('Offensive Skill Estimates with 94% HDI, Sorted by Mean')
+    plt.tight_layout()
+    plt.show()
+
+    plt.figure(figsize=(12, 8))
+    for i, player in enumerate(summary_sorted_defensive['names']):
+        color = 'blue' if players_positions.get(player, 'F') == 'F' else 'red'
+        plt.errorbar(i, means_defensive[i], yerr=[[errors_defensive[0][i]], [errors_defensive[1][i]]], 
+                     fmt='o', capsize=5, capthick=2, color=color)
+    plt.xticks(range(len(summary_sorted_defensive['names'])), summary_sorted_defensive['names'], rotation='vertical')
+    plt.xlabel('Player')
+    plt.ylabel('Defensive Skill Estimate')
+    plt.title('Defensive Skill Estimates with 94% HDI, Sorted by Mean')
+    plt.tight_layout()
+    plt.show()
